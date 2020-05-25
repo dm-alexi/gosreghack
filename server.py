@@ -2,8 +2,11 @@ import numpy as np
 import skimage.io
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import Dense,Dropout, Conv2D,Conv2DTranspose, BatchNormalization, Activation,AveragePooling2D,GlobalAveragePooling2D, Input, Concatenate, MaxPool2D, Add, UpSampling2D, LeakyReLU,ZeroPadding2D
+from tensorflow.keras.models import Model
 import cv2
 import efficientnet.tfkeras as efn
+from matplotlib import pyplot as plt
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 def aggregation_block(x_shallow, x_deep, deep_ch, out_ch):
