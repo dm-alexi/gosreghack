@@ -251,6 +251,8 @@ plate_coordinates_predictor.load_weights('hakaton_plate_detection_best_checkpoin
 
 carset = ['KAMAZ_ALLKAMAZ_C', 'LADA_PRIORA_B', 'MAZDA_3_B', 'RENAULT_DUSTER_B', 'SCANIA_ALLSCANIA_C', 'TOYOTA_RAV4_B', 'VOLVO_ALLVOLVO_C', 'VOLKSWAGEN_TIGUAN_B', 'VOLKSWAGEN_POLO_B', 'KIA_RIO_B', 'HYUNDAI_SOLARIS_B']
 img_size = 512
+category_n=1
+output_layer_n=category_n+4
 
 pred_out_h=int(img_size/4)
 pred_out_w=int(img_size/4)
