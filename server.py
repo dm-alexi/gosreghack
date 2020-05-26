@@ -225,12 +225,13 @@ def analyze(model, carset, img_size):
 	image = image / 255.0
 	image_ = cv2.resize(image, (img_size,img_size))
 	image = np.reshape(image_,(1,img_size,img_size,3))
-	car_prediction = model.predict(image, batch_size=1)
-	car_prediction = np.argmax(car_prediction, axis = 1)[0]
+	probabilities = model.predict(image, batch_size=1)
+	car_prediction = np.argmax(probabilities, axis = 1)[0]
 	if car_prediction >= 0 and car_prediction < len(carset):
 		result = carset[car_prediction]
 	else:
 		return ""
+	result['probability'] = float(max(probabilities[0]))
 	# number coordinates detection
 	pred_out_h=int(img_size/4)
 	pred_out_w=int(img_size/4)
@@ -243,8 +244,8 @@ def analyze(model, carset, img_size):
 	preds, scores = visualize(box_and_score,image_)
 	#print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
 	result['coord'] = [(int(preds[0][0]), int(preds[0][1])), (int(preds[0][0]+preds[0][2]), int(preds[0][1]+preds[0][3]))]
-	#plt.figure(figsize=(10,10))
-	#plt.imshow(image_)
+	plt.figure(figsize=(10,10))
+	plt.imshow(image_)
 	return json.dumps(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
