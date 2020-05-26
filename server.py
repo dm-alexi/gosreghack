@@ -223,7 +223,7 @@ def analyze(model, carset, img_size):
 	image = skimage.io.imread('temp.jpg')
 	image = image / 255.0
 	image_ = cv2.resize(image, (img_size,img_size))
-	image_ = np.reshape(image_,(1,img_size,img_size,3))
+	image = np.reshape(image_,(1,img_size,img_size,3))
 	car_prediction = model.predict(image, batch_size=1)
 	car_prediction = np.argmax(car_prediction, axis = 1)[0]
 	if car_prediction >= 0 and car_prediction < len(carset):
