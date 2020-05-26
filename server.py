@@ -265,6 +265,8 @@ class HttpProcessor(BaseHTTPRequestHandler):
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
+category_n=1
+output_layer_n=category_n+4
 plate_coordinates_predictor = create_model(input_shape=(img_size,img_size,3))
 plate_coordinates_predictor.load_weights('hakaton_plate_detection_best_checkpoint.h5')
 carset = [{'brand' : 'KAMAZ', 'model' : '', 'veh_type' : 'C'},
