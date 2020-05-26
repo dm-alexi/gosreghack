@@ -8,6 +8,7 @@ import cv2
 import efficientnet.tfkeras as efn
 from matplotlib import pyplot as plt
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import json
 
 def aggregation_block(x_shallow, x_deep, deep_ch, out_ch):
     x_deep= Conv2DTranspose(deep_ch, kernel_size=2, strides=2, padding='same', use_bias=False)(x_deep)
@@ -18,16 +19,19 @@ def aggregation_block(x_shallow, x_deep, deep_ch, out_ch):
     x = BatchNormalization()(x)   
     x = LeakyReLU(alpha=0.1)(x)
     return x
+
 def cbr(x, out_layer, kernel, stride):
     x=Conv2D(out_layer, kernel_size=kernel, strides=stride, padding="same")(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.1)(x)
     return x
+
 def resblock(x_in,layer_n):
     x=cbr(x_in,layer_n,3,1)
     x=cbr(x,layer_n,3,1)
     x=Add()([x,x_in])
-    return x  
+    return x
+
 def create_model(input_shape, aggregation=True):
     input_layer = Input(input_shape)
     input_layer_1=AveragePooling2D(2)(input_layer)
@@ -97,8 +101,8 @@ def create_model(input_shape, aggregation=True):
     out = Activation("sigmoid")(x)
     
     model=Model(input_layer, out)
-    
     return model
+
 def NMS_all(predicts,category_n, pred_out_h, pred_out_w, score_thresh,iou_thresh):
     y_c=predicts[...,category_n]+np.arange(pred_out_h).reshape(-1,1)
     x_c=predicts[...,category_n+1]+np.arange(pred_out_w).reshape(1,-1)
@@ -133,14 +137,12 @@ def NMS(score,y_c,x_c,height,width,iou_thresh,pred_out_h, pred_out_w,merge_mode=
         bottom=height
         right=width
     else:
-        
         score=score.reshape(-1)
         y_c=y_c.reshape(-1)
         x_c=x_c.reshape(-1)
         height=height.reshape(-1)
         width=width.reshape(-1)
         size=height*width
-
 
         top=y_c-height/2
         left=x_c-width/2
@@ -171,7 +173,6 @@ def NMS(score,y_c,x_c,height,width,iou_thresh,pred_out_h, pred_out_w,merge_mode=
     box_idx=np.arange(len(top))
     alive_box=[]
     while len(box_idx)>0:
-  
         alive_box.append(box_idx[0])
 
         y1=np.maximum(top[0],top)
@@ -203,7 +204,6 @@ def visualize(box_and_score,img):
     for i in reversed(list(range(number_of_rect))):
         predicted_class, score, top, left, bottom, right = box_and_score[i,:]
 
-
         top = np.floor(top).astype('int32')
         left = np.floor(left).astype('int32')
         bottom = np.floor(bottom).astype('int32')
@@ -218,15 +218,33 @@ def visualize(box_and_score,img):
     
     return np.array(boxes), np.array(scores)
 
-def predict(model, carset, img_size):
+def analyze(model, carset, img_size):
+	# car model detection
 	image = skimage.io.imread('temp.jpg')
 	image = image / 255.0
-	image = cv2.resize(image, (img_size,img_size))
-	image = np.reshape(image,(1,img_size,img_size,3))
-	prediction = model.predict(image, batch_size=1)
-	prediction = np.argmax(prediction, axis = 1)[0]
-	if prediction >= 0 and prediction < len(carset):
-		return(carset[prediction])
+	image_ = cv2.resize(image, (img_size,img_size))
+	image_ = np.reshape(image_,(1,img_size,img_size,3))
+	car_prediction = model.predict(image, batch_size=1)
+	car_prediction = np.argmax(car_prediction, axis = 1)[0]
+	if car_prediction >= 0 and car_prediction < len(carset):
+		result = carset[car_prediction]
+	else:
+		return ""
+	# number coordinates detection
+	pred_out_h=int(img_size/4)
+	pred_out_w=int(img_size/4)
+	category_n = 1
+	predict = plate_coordinates_predictor.predict(image)
+	predict = predict.reshape(pred_out_h,pred_out_w,(category_n+4))
+	print_h, print_w = image.shape[1:3]
+	box_and_score=NMS_all(predict,category_n, pred_out_h, pred_out_w, score_thresh=0.05,iou_thresh=0.05)
+	box_and_score=box_and_score*[1,1,print_h/pred_out_h,print_w/pred_out_w,print_h/pred_out_h,print_w/pred_out_w]
+	preds, scores = visualize(box_and_score,image_)
+	#print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
+	result['coord'] = [(preds[0][0], preds[0][1]+preds[0][3]), (preds[0][0]+preds[0][2], preds[0][1])]
+	#plt.figure(figsize=(10,10))
+	#plt.imshow(image_)
+	return json.dump(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -243,15 +261,24 @@ class HttpProcessor(BaseHTTPRequestHandler):
 		self.end_headers()
 		with open('temp.jpg', 'wb') as f:
 			f.write(body)
-		self.wfile.write(predict(model, carset, img_size).encode())
+		self.wfile.write(analyze(model, carset, img_size).encode())
 
-model = load_model('hakaton_b0.h5')
+model = load_model('hakaton_b0_1.h5')
+img_size = 512
 plate_coordinates_predictor = create_model(input_shape=(img_size,img_size,3))
 plate_coordinates_predictor.load_weights('hakaton_plate_detection_best_checkpoint.h5')
-
-carset = ['KAMAZ_ALLKAMAZ_C', 'LADA_PRIORA_B', 'MAZDA_3_B', 'RENAULT_DUSTER_B', 'SCANIA_ALLSCANIA_C', 'TOYOTA_RAV4_B', 'VOLVO_ALLVOLVO_C', 'VOLKSWAGEN_TIGUAN_B', 'VOLKSWAGEN_POLO_B', 'KIA_RIO_B', 'HYUNDAI_SOLARIS_B']
-img_size = 512
-
+carset = [{'brand' : 'KAMAZ', 'model' : '', 'veh_type' : 'C'},
+		{'brand' : 'LADA', 'model' : 'PRIORA', 'veh_type' : 'B'},
+		{'brand' : 'MAZDA', 'model' : '3', 'veh_type' : 'B'},
+		{'brand' : 'RENAULT', 'model' : 'DUSTER', 'veh_type' : 'B'},
+		{'brand' : 'SCANIA', 'model' : '', 'veh_type' : 'C'},
+		{'brand' : 'TOYOTA', 'model' : 'RAV4', 'veh_type' : 'B'},
+		{'brand' : 'VOLVO', 'model' : '', 'veh_type' : 'C'},
+		{'brand' : 'VOLKSWAGEN', 'model' : 'TIGUAN', 'veh_type' : 'B'},
+		{'brand' : 'VOLKSWAGEN', 'model' : 'POLO', 'veh_type' : 'B'},
+		{'brand' : 'KIA', 'model' : 'RIO', 'veh_type' : 'B'},
+		{'brand' : 'HYUNDAI', 'model' : 'SOLARIS', 'veh_type' : 'B'}]
+"""
 pred_out_h=int(img_size/4)
 pred_out_w=int(img_size/4)
 predict = plate_coordinates_predictor.predict(image)
@@ -263,8 +290,7 @@ preds, scores = visualize(box_and_score,image_)
 print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
 plt.figure(figsize=(10,10))
 plt.imshow(image_)
-
-
+"""
 server_address = ("", 8080)
 httpd = HTTPServer(server_address, HttpProcessor)
 httpd.serve_forever()
