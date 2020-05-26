@@ -9,6 +9,7 @@ import efficientnet.tfkeras as efn
 from matplotlib import pyplot as plt
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import base64
 
 def aggregation_block(x_shallow, x_deep, deep_ch, out_ch):
     x_deep= Conv2DTranspose(deep_ch, kernel_size=2, strides=2, padding='same', use_bias=False)(x_deep)
@@ -223,7 +224,7 @@ def analyze(model, carset, img_size):
 	image = skimage.io.imread('temp.jpg')
 	image = image / 255.0
 	image_ = cv2.resize(image, (img_size,img_size))
-	image_ = np.reshape(image_,(1,img_size,img_size,3))
+	image = np.reshape(image_,(1,img_size,img_size,3))
 	car_prediction = model.predict(image, batch_size=1)
 	car_prediction = np.argmax(car_prediction, axis = 1)[0]
 	if car_prediction >= 0 and car_prediction < len(carset):
@@ -241,10 +242,10 @@ def analyze(model, carset, img_size):
 	box_and_score=box_and_score*[1,1,print_h/pred_out_h,print_w/pred_out_w,print_h/pred_out_h,print_w/pred_out_w]
 	preds, scores = visualize(box_and_score,image_)
 	#print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
-	result['coord'] = [(preds[0][0], preds[0][1]+preds[0][3]), (preds[0][0]+preds[0][2], preds[0][1])]
+	result['coord'] = [(int(preds[0][0]), int(preds[0][1])), (int(preds[0][0]+preds[0][2]), int(preds[0][1]+preds[0][3]))]
 	#plt.figure(figsize=(10,10))
 	#plt.imshow(image_)
-	return json.dump(result)
+	return json.dumps(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -280,19 +281,7 @@ carset = [{'brand' : 'KAMAZ', 'model' : '', 'veh_type' : 'C'},
 		{'brand' : 'VOLKSWAGEN', 'model' : 'POLO', 'veh_type' : 'B'},
 		{'brand' : 'KIA', 'model' : 'RIO', 'veh_type' : 'B'},
 		{'brand' : 'HYUNDAI', 'model' : 'SOLARIS', 'veh_type' : 'B'}]
-"""
-pred_out_h=int(img_size/4)
-pred_out_w=int(img_size/4)
-predict = plate_coordinates_predictor.predict(image)
-predict = predict.reshape(pred_out_h,pred_out_w,(category_n+4))
-print_h, print_w = image.shape[1:3]
-box_and_score=NMS_all(predict,category_n, pred_out_h, pred_out_w, score_thresh=0.05,iou_thresh=0.05)
-box_and_score=box_and_score*[1,1,print_h/pred_out_h,print_w/pred_out_w,print_h/pred_out_h,print_w/pred_out_w]
-preds, scores = visualize(box_and_score,image_)
-print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
-plt.figure(figsize=(10,10))
-plt.imshow(image_)
-"""
+
 server_address = ("", 8080)
 httpd = HTTPServer(server_address, HttpProcessor)
 httpd.serve_forever()
