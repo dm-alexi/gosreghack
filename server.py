@@ -219,7 +219,7 @@ def visualize(box_and_score,img):
     
     return np.array(boxes), np.array(scores)
 
-def analyze(model, carset, img_size):
+def analyze(model, carset, img_size, filename):
 	# car model detection
 	image = skimage.io.imread('temp.jpg')
 	image = image / 255.0
@@ -244,8 +244,10 @@ def analyze(model, carset, img_size):
 	preds, scores = visualize(box_and_score,image_)
 	#print ('plate coordinates: ', 'x_min =',preds[0][0], 'y_min =' , preds[0][1]+preds[0][3], 'x_max =', preds[0][0]+preds[0][2],'y_max =', preds[0][1])
 	result['coord'] = [(int(preds[0][0]), int(preds[0][1])), (int(preds[0][0]+preds[0][2]), int(preds[0][1]+preds[0][3]))]
-	plt.figure(figsize=(10,10))
-	plt.imshow(image_)
+	#plt.figure(figsize=(10,10))
+	#plt.imshow(image_)
+	#plt.show()
+	result['id'] = filename
 	return json.dumps(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
@@ -257,13 +259,17 @@ class HttpProcessor(BaseHTTPRequestHandler):
 
 	def do_POST(self):
 		content_length = int(self.headers['Content-Length'])
+		full_request = self.rfile.read(content_length)
+		#print(self.headers)
+		filename = full_request.partition(b'filename=')[2].partition(b'\r\n')[0].decode('utf-8').strip('"')
+		print(filename)
 		end_file = ('\r\n--' + self.headers['Content-Type'].partition("boundary=")[2]).encode()
-		body = self.rfile.read(content_length).partition(b'\r\n\r\n')[2].partition(end_file)[0]
+		body = full_request.partition(b'\r\n\r\n')[2].partition(end_file)[0]
 		self.send_response(200)
 		self.end_headers()
 		with open('temp.jpg', 'wb') as f:
 			f.write(body)
-		self.wfile.write(analyze(model, carset, img_size).encode())
+		self.wfile.write(analyze(model, carset, img_size, filename).encode())
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
