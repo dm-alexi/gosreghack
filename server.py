@@ -247,15 +247,23 @@ def analyze(model, carset, img_size, filename):
 	#plt.figure(figsize=(10,10))
 	#plt.imshow(image_)
 	#plt.show()
+	cv2.imwrite('sign.jpg', image_)
 	result['id'] = filename
 	return json.dumps(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
 	def do_GET(self):
-		self.send_response(200)
-		self.end_headers()
-		with open('index.html', "rb") as f:
-			self.wfile.write(f.read())
+		if self.path.endswith(".jpg"):
+			self.send_response(200)
+			self.send_header('Content-type',"image/jpg")
+			self.end_headers()
+			with open('sign.jpg', "rb") as f:
+				self.wfile.write(f.read())
+		else:
+			self.send_response(200)
+			self.end_headers()
+			with open('index.html', "rb") as f:
+				self.wfile.write(f.read())
 
 	def do_POST(self):
 		content_length = int(self.headers['Content-Length'])
@@ -270,6 +278,7 @@ class HttpProcessor(BaseHTTPRequestHandler):
 		with open('temp.jpg', 'wb') as f:
 			f.write(body)
 		self.wfile.write(analyze(model, carset, img_size, filename).encode())
+		
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
