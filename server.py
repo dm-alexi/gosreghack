@@ -222,9 +222,13 @@ def visualize(box_and_score,img):
 def analyze(model, carset, img_size, filename):
 	# car model detection
 	image = skimage.io.imread('temp.jpg')
-	image = image / 255.0
 	image_ = cv2.resize(image, (img_size,img_size))
 	image = np.reshape(image_,(1,img_size,img_size,3))
+	image = image / 255.0
+	#image = skimage.io.imread('temp.jpg')
+	#image = image / 255.0
+	#image_ = cv2.resize(image, (img_size,img_size))
+	#image = np.reshape(image_,(1,img_size,img_size,3))
 	probabilities = model.predict(image, batch_size=1)
 	car_prediction = np.argmax(probabilities, axis = 1)[0]
 	if car_prediction >= 0 and car_prediction < len(carset):
@@ -247,7 +251,7 @@ def analyze(model, carset, img_size, filename):
 	#plt.figure(figsize=(10,10))
 	#plt.imshow(image_)
 	#plt.show()
-	cv2.imwrite('sign.jpg', image_)
+	skimage.io.imsave('image.jpg',image_)
 	result['id'] = filename
 	return json.dumps(result)
 
@@ -257,7 +261,7 @@ class HttpProcessor(BaseHTTPRequestHandler):
 			self.send_response(200)
 			self.send_header('Content-type',"image/jpg")
 			self.end_headers()
-			with open('sign.jpg', "rb") as f:
+			with open('image.jpg', "rb") as f:
 				self.wfile.write(f.read())
 		else:
 			self.send_response(200)
@@ -270,15 +274,14 @@ class HttpProcessor(BaseHTTPRequestHandler):
 		full_request = self.rfile.read(content_length)
 		#print(self.headers)
 		filename = full_request.partition(b'filename=')[2].partition(b'\r\n')[0].decode('utf-8').strip('"')
-		print(filename)
 		end_file = ('\r\n--' + self.headers['Content-Type'].partition("boundary=")[2]).encode()
 		body = full_request.partition(b'\r\n\r\n')[2].partition(end_file)[0]
 		self.send_response(200)
 		self.end_headers()
 		with open('temp.jpg', 'wb') as f:
 			f.write(body)
+		self.wfile.write("<!DOCTYPE HTML><html><img src='sign.jpg'><br><hr></html>".encode())
 		self.wfile.write(analyze(model, carset, img_size, filename).encode())
-		
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
