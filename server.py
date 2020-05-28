@@ -219,7 +219,7 @@ def visualize(box_and_score,img):
     
     return np.array(boxes), np.array(scores)
 
-def analyze(model, carset, img_size, filename):
+def analyze(model, carset, img_size, crop_h, crop_w, filename):
 	# car model detection
 	image = skimage.io.imread('temp.jpg')
 	image_ = cv2.resize(image, (img_size,img_size))
@@ -253,6 +253,30 @@ def analyze(model, carset, img_size, filename):
 	#plt.show()
 	skimage.io.imsave('image.jpg',image_)
 	result['id'] = filename
+    #plate number optical character recognition
+    crop_img = image_[preds[0][1]:preds[0][1]+preds[0][3], preds[0][0]:preds[0][0]+preds[0][2]]
+    crop_img_ = tf.image.resize(crop_img, (crop_h,crop_w))
+    crop_img = np.reshape(crop_img_,(1,crop_h,crop_w,3))
+    crop_img = crop_img / 255.0
+    ocr_preds = plate_ocr.predict(crop_img)
+    #plt.figure(figsize=(10,10))
+    #plt.imshow(crop_img_)
+    #plt.show()
+    nums34regions = [0,1,2,3,4,5,6,7,8,9]
+    chars16 = ['А','В','Е','К','М','Н','О','Р','С','Т','У','Х']
+    chars2 = ['0','1','2','3','4','5','6','7','8','9','А','Е','К','М','О','Р','С','Т','У','Х']
+    chars5 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'А', 'В', 'Е', 'К','М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х']
+    reg = []
+    c1 = str(chars16[np.argmax(ocr_preds[0])])
+    c2 = str(chars2[np.argmax(ocr_preds[1])])
+    c3 = str(nums34regions[np.argmax(ocr_preds[2])])
+    c4 = str(nums34regions[np.argmax(ocr_preds[3])])
+    c5 = str(chars5[np.argmax(ocr_preds[4])])
+    c6 = str(chars16[np.argmax(ocr_preds[5])])
+    reg.append(nums34regions[np.argmax(ocr_preds[6])])
+    reg.append(nums34regions[np.argmax(ocr_preds[7])])
+    reg.append(nums34regions[np.argmax(ocr_preds[8])])
+    print (c1,c2,c3,c4,c5,c6,reg)
 	return json.dumps(result)
 
 class HttpProcessor(BaseHTTPRequestHandler):
@@ -285,10 +309,14 @@ class HttpProcessor(BaseHTTPRequestHandler):
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
+crop_w = 192
+crop_h = 64
 category_n=1
 output_layer_n=category_n+4
 plate_coordinates_predictor = create_model(input_shape=(img_size,img_size,3))
 plate_coordinates_predictor.load_weights('hakaton_plate_detection_best_checkpoint.h5')
+plate_ocr = load_model('hakaton_plate_ocr_b0.h5')
+
 carset = [{'brand' : 'KAMAZ', 'model' : '', 'veh_type' : 'C'},
 		{'brand' : 'LADA', 'model' : 'PRIORA', 'veh_type' : 'B'},
 		{'brand' : 'MAZDA', 'model' : '3', 'veh_type' : 'B'},
