@@ -254,30 +254,30 @@ def analyze(model, carset, img_size, crop_h, crop_w, filename):
 	skimage.io.imsave('image.jpg',image_)
 	result['id'] = filename
     #plate number optical character recognition
-    crop_img = image_[preds[0][1]:preds[0][1]+preds[0][3], preds[0][0]:preds[0][0]+preds[0][2]]
-    crop_img_ = tf.image.resize(crop_img, (crop_h,crop_w))
-    crop_img = np.reshape(crop_img_,(1,crop_h,crop_w,3))
-    crop_img = crop_img / 255.0
-    ocr_preds = plate_ocr.predict(crop_img)
+	crop_img = image_[preds[0][1]:preds[0][1]+preds[0][3], preds[0][0]:preds[0][0]+preds[0][2]]
+	crop_img_ = tf.image.resize(crop_img, (crop_h,crop_w))
+	crop_img = np.reshape(crop_img_,(1,crop_h,crop_w,3))
+	crop_img = crop_img / 255.0
+	ocr_preds = plate_ocr.predict(crop_img)
     #plt.figure(figsize=(10,10))
     #plt.imshow(crop_img_)
     #plt.show()
-    nums34regions = [0,1,2,3,4,5,6,7,8,9]
-    chars16 = ['А','В','Е','К','М','Н','О','Р','С','Т','У','Х']
-    chars2 = ['0','1','2','3','4','5','6','7','8','9','А','Е','К','М','О','Р','С','Т','У','Х']
-    chars5 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'А', 'В', 'Е', 'К','М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х']
-    reg = []
-    c1 = str(chars16[np.argmax(ocr_preds[0])])
-    c2 = str(chars2[np.argmax(ocr_preds[1])])
-    c3 = str(nums34regions[np.argmax(ocr_preds[2])])
-    c4 = str(nums34regions[np.argmax(ocr_preds[3])])
-    c5 = str(chars5[np.argmax(ocr_preds[4])])
-    c6 = str(chars16[np.argmax(ocr_preds[5])])
-    reg.append(nums34regions[np.argmax(ocr_preds[6])])
-    reg.append(nums34regions[np.argmax(ocr_preds[7])])
-    reg.append(nums34regions[np.argmax(ocr_preds[8])])
-    print (c1,c2,c3,c4,c5,c6,reg)
-	return json.dumps(result)
+	nums34regions = [0,1,2,3,4,5,6,7,8,9]
+	chars16 = ['А','В','Е','К','М','Н','О','Р','С','Т','У','Х']
+	chars2 = ['0','1','2','3','4','5','6','7','8','9','А','Е','К','М','О','Р','С','Т','У','Х']
+	chars5 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'А', 'В', 'Е', 'К','М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х']
+	reg = []
+	c1 = str(chars16[np.argmax(ocr_preds[0])])
+	c2 = str(chars2[np.argmax(ocr_preds[1])])
+	c3 = str(nums34regions[np.argmax(ocr_preds[2])])
+	c4 = str(nums34regions[np.argmax(ocr_preds[3])])
+	c5 = str(chars5[np.argmax(ocr_preds[4])])
+	c6 = str(chars16[np.argmax(ocr_preds[5])])
+	reg.append(nums34regions[np.argmax(ocr_preds[6])])
+	reg.append(nums34regions[np.argmax(ocr_preds[7])])
+	reg.append(nums34regions[np.argmax(ocr_preds[8])])
+	result['plate'] = ''.join((c1,c2,c3,c4,c5,c6)) + ''.join(str(x) for x in reg)
+	return json.dumps(result, ensure_ascii=False)
 
 class HttpProcessor(BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -296,16 +296,16 @@ class HttpProcessor(BaseHTTPRequestHandler):
 	def do_POST(self):
 		content_length = int(self.headers['Content-Length'])
 		full_request = self.rfile.read(content_length)
-		#print(self.headers)
 		filename = full_request.partition(b'filename=')[2].partition(b'\r\n')[0].decode('utf-8').strip('"')
 		end_file = ('\r\n--' + self.headers['Content-Type'].partition("boundary=")[2]).encode()
 		body = full_request.partition(b'\r\n\r\n')[2].partition(end_file)[0]
 		self.send_response(200)
+		self.send_header('Content-type',"text/html;charset=utf8")
 		self.end_headers()
 		with open('temp.jpg', 'wb') as f:
 			f.write(body)
 		self.wfile.write("<!DOCTYPE HTML><html><img src='sign.jpg'><br><hr></html>".encode())
-		self.wfile.write(analyze(model, carset, img_size, filename).encode())
+		self.wfile.write(analyze(model, carset, img_size, crop_h, crop_w, filename).encode())
 
 model = load_model('hakaton_b0_1.h5')
 img_size = 512
